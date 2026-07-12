@@ -6,4 +6,10 @@ simple instructions for updating latest project files
   - git commit -m "Your commit message"
   - git push origin your-branch-name
 
-  
+
+- update the code base with virtual environment and dependencies:
+  - create a virtual environment using `python -m venv env`
+  - activate the virtual environment:
+    - On Windows: `.\env\Scripts\activate`
+    - On macOS/Linux: `source env/bin/activate`
+  - install dependencies using `pip install -r requirements.txt`
