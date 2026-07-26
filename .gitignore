@@ -1,0 +1,2 @@
+# Keep Excel workbooks local-only.
+*.xlsx
