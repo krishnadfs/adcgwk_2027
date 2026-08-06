@@ -18,7 +18,7 @@ from openpyxl.utils import get_column_letter
 CUSTOMER_ID = 12682
 
 # Excel file name/path
-INPUT_FILE = Path("data/source.xlsx")
+INPUT_FILE = Path("data/customer_transactions_sample_v4.xlsx")
 
 # Output folder
 OUTPUT_DIR = Path("output")
