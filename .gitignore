@@ -1,2 +1,5 @@
 # Keep Excel workbooks local-only.
 *.xlsx
+
+# Generated output files.
+output/
