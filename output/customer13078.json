@@ -5,14 +5,13 @@
         "active_months": 9,
         "inactive_months": 4,
         "total_spend": 1876.62,
-        "final_avg_spent": 4.3
+        "final_avg_spent": 3.9508
     },
     "Reliability": {
         "total_months": 13,
         "active_months": 9,
         "inactive_months": 4,
         "reliability_score": 69.23,
-        "numerical_score": 69.23,
         "prediction": "Likely to Stay"
     },
     "Details": [
@@ -49,8 +48,8 @@
             "invoices": 19,
             "value_per_invoice": 3.7531578947368422,
             "till_date": 385.6599999999999,
-            "avg_spent": 3.7986363636363634,
-            "rel_incr_increase": -0.13073863636363559,
+            "avg_spent": 3.8955555555555548,
+            "rel_incr_increase": -0.03381944444444418,
             "spend_flag": 0,
             "no_decline_flag": 1,
             "active_period": "Inactive"
@@ -62,8 +61,8 @@
             "invoices": 41,
             "value_per_invoice": 3.975853658536583,
             "till_date": 548.6699999999998,
-            "avg_spent": 3.9053333333333318,
-            "rel_incr_increase": 0.1066969696969684,
+            "avg_spent": 3.9190714285714274,
+            "rel_incr_increase": 0.023515873015872657,
             "spend_flag": 1,
             "no_decline_flag": 1,
             "active_period": "Active"
@@ -75,8 +74,8 @@
             "invoices": 16,
             "value_per_invoice": 3.886875,
             "till_date": 610.8599999999999,
-            "avg_spent": 3.9508771929824547,
-            "rel_incr_increase": 0.045543859649122886,
+            "avg_spent": 3.91576923076923,
+            "rel_incr_increase": -0.0033021978021974263,
             "spend_flag": 0,
             "no_decline_flag": 1,
             "active_period": "Inactive"
@@ -88,8 +87,8 @@
             "invoices": 35,
             "value_per_invoice": 4.039142857142856,
             "till_date": 752.2299999999999,
-            "avg_spent": 3.9913725490196073,
-            "rel_incr_increase": 0.0404953560371526,
+            "avg_spent": 3.938376963350785,
+            "rel_incr_increase": 0.022607732581554796,
             "spend_flag": 1,
             "no_decline_flag": 1,
             "active_period": "Active"
@@ -101,8 +100,8 @@
             "invoices": 42,
             "value_per_invoice": 3.858571428571427,
             "till_date": 914.2899999999998,
-            "avg_spent": 3.94064935064935,
-            "rel_incr_increase": -0.05072319837025718,
+            "avg_spent": 3.923991416309012,
+            "rel_incr_increase": -0.01438554704177264,
             "spend_flag": 1,
             "no_decline_flag": 1,
             "active_period": "Active"
@@ -114,8 +113,8 @@
             "invoices": 46,
             "value_per_invoice": 4.066086956521738,
             "till_date": 1101.3299999999997,
-            "avg_spent": 3.9670454545454534,
-            "rel_incr_increase": 0.026396103896103362,
+            "avg_spent": 3.9474193548387086,
+            "rel_incr_increase": 0.02342793852969649,
             "spend_flag": 1,
             "no_decline_flag": 1,
             "active_period": "Active"
@@ -127,8 +126,8 @@
             "invoices": 32,
             "value_per_invoice": 3.2553125,
             "till_date": 1205.4999999999998,
-            "avg_spent": 3.7334615384615373,
-            "rel_incr_increase": -0.23358391608391615,
+            "avg_spent": 3.8762057877813496,
+            "rel_incr_increase": -0.07121356705735904,
             "spend_flag": 1,
             "no_decline_flag": 1,
             "active_period": "Active"
@@ -140,8 +139,8 @@
             "invoices": 38,
             "value_per_invoice": 3.8250000000000006,
             "till_date": 1350.85,
-            "avg_spent": 3.564571428571429,
-            "rel_incr_increase": -0.16889010989010833,
+            "avg_spent": 3.8706303724928364,
+            "rel_incr_increase": -0.005575415288513241,
             "spend_flag": 1,
             "no_decline_flag": 1,
             "active_period": "Active"
@@ -153,8 +152,8 @@
             "invoices": 31,
             "value_per_invoice": 3.782903225806452,
             "till_date": 1468.12,
-            "avg_spent": 3.8060869565217392,
-            "rel_incr_increase": 0.24151552795031028,
+            "avg_spent": 3.863473684210526,
+            "rel_incr_increase": -0.007156688282310419,
             "spend_flag": 1,
             "no_decline_flag": 1,
             "active_period": "Active"
@@ -166,8 +165,8 @@
             "invoices": 85,
             "value_per_invoice": 4.3169411764705865,
             "till_date": 1835.0599999999997,
-            "avg_spent": 4.1742241379310325,
-            "rel_incr_increase": 0.3681371814092933,
+            "avg_spent": 3.946365591397849,
+            "rel_incr_increase": 0.08289190718732309,
             "spend_flag": 1,
             "no_decline_flag": 1,
             "active_period": "Active"
@@ -179,8 +178,8 @@
             "invoices": 10,
             "value_per_invoice": 4.156000000000001,
             "till_date": 1876.6199999999997,
-            "avg_spent": 4.299999999999998,
-            "rel_incr_increase": 0.12577586206896552,
+            "avg_spent": 3.9507789473684203,
+            "rel_incr_increase": 0.004413355970571242,
             "spend_flag": 0,
             "no_decline_flag": 1,
             "active_period": "Inactive"

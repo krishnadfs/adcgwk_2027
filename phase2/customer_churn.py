@@ -4,7 +4,7 @@
 # avgSpent (invoice-weighted running average), relIncrIncrease,
 # spendFlag, noDeclineFlag, activePeriod.
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Dict, Optional
 import pandas as pd
 import os
@@ -83,18 +83,11 @@ class ActivePeriodClassifier:
             cum_invoices += r.invoices
             r.till_date = cum_price
 
-            # invoice-weighted running average spend per invoice
-            # Avg Spend (Excel Column L)
-
-            if i == 0:
-                r.avg_spent = r.value_per_invoice
-            else:
-                prev = self.rows[i - 1]
-
-                r.avg_spent = (
-                (r.value_per_invoice * r.invoices) +
-                (prev.value_per_invoice * prev.invoices)
-            ) / (r.invoices + prev.invoices)
+            # Cumulative invoice-weighted average spend per invoice
+            r.avg_spent = (
+            cum_price / cum_invoices
+            if cum_invoices else 0.0
+            )
 
             r.rel_incr_increase = (
             0.0 if prev_avg is None
@@ -128,7 +121,6 @@ class ActivePeriodClassifier:
 
     def to_dataframe(self):
         """Return computed rows as a pandas DataFrame (requires pandas)."""
-        import pandas as pd
         return pd.DataFrame(self.to_records())
 
     def active_periods(self) -> List[str]:
@@ -171,17 +163,12 @@ class ReliabilityScoreCalculator:
 
         else:
             prediction = "Likely to Exit"
-        numerical_score = (
-            reliability_score * 0.7 +
-            (active_months / total_months) * 100 * 0.3
-        )
 
         return {
             "total_months": total_months,
             "active_months": active_months,
             "inactive_months": inactive_months,
             "reliability_score": round(reliability_score, 2),
-            "numerical_score": round(numerical_score, 2),
             "prediction": prediction
         }
 def analyze_customer(df, customer_id):
@@ -330,6 +317,86 @@ if __name__ == "__main__":
             ]
         ].head(20)
     )
+# ---------------------------------------------------------
+# CLUSTER INTERPRETATION
+# ---------------------------------------------------------
+
+    print("\nCluster Summary")
+
+    cluster_summary = (
+            summary.groupby("Cluster")
+            .agg(
+        Customer_Count=("Customer_ID", "count"),
+        Avg_Total_Spend=("Total_Spend", "mean"),
+        Avg_Reliability=("Reliability_Score", "mean"),
+        Avg_Active_Months=("Active_Months", "mean"),
+        Avg_Inactive_Months=("Inactive_Months", "mean")
+    )
+        .reset_index()
+)
+
+# Assign business meaning to each cluster
+    def classify_cluster(row): 
+
+        if row["Avg_Reliability"] < 30:
+            return "High Risk Customers"
+
+        elif row["Avg_Reliability"] < 60:
+            return "Medium Risk Customers"
+
+        else:
+             return "low risk Customers"
+
+
+    cluster_summary["Customer_Segment"] = cluster_summary.apply(
+        classify_cluster,
+        axis=1
+    )
+    cluster_summary.to_csv(
+    "output/cluster_summary.csv",
+    index=False
+)
+
+    cluster_summary.to_json(
+    "output/cluster_summary.json",
+    orient="records",
+    indent=4
+)
+
+    print(cluster_summary)
+
+    def assign_risk(reliability):
+
+        if reliability < 30:
+            return "High Risk"
+
+        elif reliability < 60:
+            return "Medium Risk"
+
+        else:
+            return "Low Risk"
+
+
+    summary["Risk_Level"] = summary["Reliability_Score"].apply(assign_risk)
+
+    print("\nCustomer Risk Distribution")
+    print(summary["Risk_Level"].value_counts())
+
+    print("\nCustomer Risk Details")
+    print(
+        summary[
+            [
+            "Customer_ID",
+            "Total_Spend",
+            "Reliability_Score",
+            "Active_Months",
+            "Inactive_Months",
+            "Cluster",
+            "Risk_Level"
+        ]
+    ]
+)
+    
 
         # ---------- Cluster Visualization ----------
 
@@ -365,6 +432,23 @@ if __name__ == "__main__":
     "output/all_customers_summary.csv",
     index=False
 )
+    plt.figure(figsize=(8, 5))
+
+    summary["Risk_Level"].value_counts().plot(kind="bar")
+
+    plt.title("Customer Risk Distribution")
+    plt.xlabel("Risk Level")
+    plt.ylabel("Number of Customers")
+    plt.xticks(rotation=0)
+    plt.tight_layout()
+
+    plt.savefig(
+    "output/customer_risk_distribution.png",
+    dpi=300,
+    bbox_inches="tight"
+)
+
+    plt.show()
 
     print("\nAll customers summary saved.")
     
@@ -390,5 +474,3 @@ if __name__ == "__main__":
     )
 
     print("All customers JSON saved.")
-
-    print("\nAll customers summary saved.")
