@@ -10,6 +10,8 @@ import pandas as pd
 import os
 import json
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
 
 
 @dataclass
@@ -278,23 +280,93 @@ if __name__ == "__main__":
             continue
 
         all_results.append({
-        "Customer_ID": cid,
-        "Total_Months": result["Reliability"]["total_months"],
-        "Active_Months": result["Reliability"]["active_months"],
-        "Inactive_Months": result["Reliability"]["inactive_months"],
-        "Reliability_Score": result["Reliability"]["reliability_score"],
-        "Total_Spend": result["Summary"]["total_spend"],
-        "Final_Avg_Spend": result["Summary"]["final_avg_spent"],
-        "Numerical_Score": result["Reliability"]["numerical_score"],
-        "Prediction": result["Reliability"]["prediction"]
-        })
+    "Customer_ID": cid,
+    "Total_Months": result["Reliability"]["total_months"],
+    "Active_Months": result["Reliability"]["active_months"],
+    "Inactive_Months": result["Reliability"]["inactive_months"],
+    "Reliability_Score": result["Reliability"]["reliability_score"],
+    "Total_Spend": result["Summary"]["total_spend"],
+    "Final_Avg_Spent": result["Summary"]["final_avg_spent"]
+})
 
     summary = pd.DataFrame(all_results)
 
-    summary.to_csv(
-        "output/all_customers_summary.csv",
-        index=False
+        # ---------- Customer Clustering ----------
+
+    features = [
+        "Total_Spend",
+        "Active_Months",
+        "Inactive_Months",
+        "Reliability_Score",
+        "Final_Avg_Spent"
+    ]
+
+    # Prepare features for clustering
+    X = summary[features].fillna(0)
+
+    # Standardize the features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Create customer clusters
+    kmeans = KMeans(
+        n_clusters=4,
+        random_state=42,
+        n_init=10
     )
+
+    summary["Cluster"] = kmeans.fit_predict(X_scaled)
+
+    print("\nCustomer Clustering Results")
+    print(
+        summary[
+            [
+                "Customer_ID",
+                "Total_Spend",
+                "Reliability_Score",
+                "Active_Months",
+                "Inactive_Months",
+                "Cluster"
+            ]
+        ].head(20)
+    )
+
+        # ---------- Cluster Visualization ----------
+
+    plt.figure(figsize=(10, 6))
+
+    for cluster in sorted(summary["Cluster"].unique()):
+
+        cluster_data = summary[
+            summary["Cluster"] == cluster
+        ]
+
+        plt.scatter(
+            cluster_data["Total_Spend"],
+            cluster_data["Reliability_Score"],
+            label=f"Cluster {cluster}"
+        )
+
+    plt.xlabel("Total Spend")
+    plt.ylabel("Reliability Score")
+    plt.title("Customer Segmentation")
+    plt.legend()
+    plt.grid(True)
+
+    plt.savefig(
+        "output/customer_clusters.png",
+        dpi=300,
+        bbox_inches="tight"
+    )
+
+    plt.show()
+    os.makedirs("output", exist_ok=True)
+    summary.to_csv(
+    "output/all_customers_summary.csv",
+    index=False
+)
+
+    print("\nAll customers summary saved.")
     
 
     summary.plot(
