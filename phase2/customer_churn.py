@@ -338,24 +338,63 @@ if __name__ == "__main__":
     )
         .reset_index()
 )
+# Assign meaningful business segments to each cluster
+# K-Means cluster numbers are arbitrary, so we give them
+# business meaning based on reliability and spending.
 
-# Assign business meaning to each cluster
-    def classify_cluster(row): 
+# Cluster with the lowest average reliability
+# = customers most likely to exit
+    exit_cluster = cluster_summary.loc[
+    cluster_summary["Avg_Reliability"].idxmin(),
+    "Cluster"
+]
 
-        if row["Avg_Reliability"] < 30:
-            return "High Risk Customers"
+# Cluster with the highest average spending
+# = high-value customers
+    high_value_cluster = cluster_summary.loc[
+    cluster_summary["Avg_Total_Spend"].idxmax(),
+    "Cluster"
+]
 
-        elif row["Avg_Reliability"] < 60:
-            return "Medium Risk Customers"
-
-        else:
-             return "low risk Customers"
-
-
-    cluster_summary["Customer_Segment"] = cluster_summary.apply(
-        classify_cluster,
-        axis=1
+# From the remaining clusters, choose the one with
+# the highest reliability as likely to stay.
+    remaining_clusters = cluster_summary[
+    ~cluster_summary["Cluster"].isin(
+        [exit_cluster, high_value_cluster]
     )
+]
+
+    stay_cluster = remaining_clusters.loc[
+    remaining_clusters["Avg_Reliability"].idxmax(),
+    "Cluster"
+]
+
+# The remaining cluster becomes At Risk
+    at_risk_cluster = cluster_summary[
+    ~cluster_summary["Cluster"].isin(
+        [exit_cluster, high_value_cluster, stay_cluster]
+    )
+]["Cluster"].iloc[0]
+
+# Map cluster numbers to meaningful business segments
+    segment_map = {
+    exit_cluster: "Likely to Exit",
+    at_risk_cluster: "At Risk",
+    stay_cluster: "Likely to Stay",
+    high_value_cluster: "High-Value Loyal"
+}
+
+# Add segment name to cluster summary
+    cluster_summary["Customer_Segment"] = cluster_summary["Cluster"].map(
+    segment_map
+)
+
+# Add segment name to every customer
+    summary["Customer_Segment"] = summary["Cluster"].map(
+    segment_map
+)
+   
+
     cluster_summary.to_csv(
     os.path.join(OUTPUT_DIR, "cluster_summary.csv"),
     index=False
@@ -396,6 +435,7 @@ if __name__ == "__main__":
             "Active_Months",
             "Inactive_Months",
             "Cluster",
+            "Customer_Segment",
             "Risk_Level"
         ]
     ]
@@ -412,10 +452,12 @@ if __name__ == "__main__":
             summary["Cluster"] == cluster
         ]
 
+        segment_name = segment_map[cluster]
+
         plt.scatter(
             cluster_data["Total_Spend"],
             cluster_data["Reliability_Score"],
-            label=f"Cluster {cluster}"
+            label=segment_name
         )
 
     plt.xlabel("Total Spend")
