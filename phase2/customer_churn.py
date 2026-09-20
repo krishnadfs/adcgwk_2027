@@ -14,6 +14,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
+
+
 @dataclass
 class MonthRow:
     """One row of the pivot table (one Year_Month bucket)."""
@@ -226,16 +230,16 @@ def analyze_customer(df, customer_id):
 
 
 if __name__ == "__main__":
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     df = pd.read_excel(
-        "data/customer_transactions.xlsx",
+        os.path.join(PROJECT_ROOT, "data", "customer_transactions_sample_v4.xlsx"),
         engine="openpyxl"
     )
 
     # Single customer
     result = analyze_customer(df, 13078)
-    with open("output/customer13078.json", "w") as f:
+    with open(os.path.join(OUTPUT_DIR, "customer13078.json"), "w") as f:
         json.dump({
         "Customer_ID": result["Customer_ID"],
         "Summary": result["Summary"],
@@ -353,12 +357,12 @@ if __name__ == "__main__":
         axis=1
     )
     cluster_summary.to_csv(
-    "output/cluster_summary.csv",
+    os.path.join(OUTPUT_DIR, "cluster_summary.csv"),
     index=False
 )
 
     cluster_summary.to_json(
-    "output/cluster_summary.json",
+    os.path.join(OUTPUT_DIR, "cluster_summary.json"),
     orient="records",
     indent=4
 )
@@ -421,15 +425,14 @@ if __name__ == "__main__":
     plt.grid(True)
 
     plt.savefig(
-        "output/customer_clusters.png",
+        os.path.join(OUTPUT_DIR, "customer_clusters.png"),
         dpi=300,
         bbox_inches="tight"
     )
 
     plt.show()
-    os.makedirs("output", exist_ok=True)
     summary.to_csv(
-    "output/all_customers_summary.csv",
+    os.path.join(OUTPUT_DIR, "all_customers_summary.csv"),
     index=False
 )
     plt.figure(figsize=(8, 5))
@@ -443,7 +446,7 @@ if __name__ == "__main__":
     plt.tight_layout()
 
     plt.savefig(
-    "output/customer_risk_distribution.png",
+    os.path.join(OUTPUT_DIR, "customer_risk_distribution.png"),
     dpi=300,
     bbox_inches="tight"
 )
@@ -461,14 +464,14 @@ if __name__ == "__main__":
 
     plt.title("Customer Reliability Score")
     plt.tight_layout()
-    plt.savefig("output/reliability_plot.png")
+    plt.savefig(os.path.join(OUTPUT_DIR, "reliability_plot.png"))
     plt.show()
 
     print("Plot saved to output/reliability_plot.png")
     
 
     summary.to_json(
-    "output/all_customers_summary.json",
+    os.path.join(OUTPUT_DIR, "all_customers_summary.json"),
     orient="records",
     indent=4
     )
