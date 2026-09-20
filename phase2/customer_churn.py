@@ -389,8 +389,7 @@ if __name__ == "__main__":
     summary["Customer_Segment"] = summary["Cluster"].map(
     segment_map
 )
-    # Give every individual customer the business segment name too.
-    summary["Customer_Segment"] = summary["Cluster"].map(segment_map)
+   
 
     cluster_summary.to_csv(
     "output/cluster_summary.csv",
