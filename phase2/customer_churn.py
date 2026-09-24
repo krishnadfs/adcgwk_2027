@@ -233,7 +233,7 @@ if __name__ == "__main__":
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     df = pd.read_excel(
-        os.path.join(PROJECT_ROOT, "data", "customer_transactions_sample_v4.xlsx"),
+        os.path.join(PROJECT_ROOT, "data", "customer_transactions.xlsx"),
         engine="openpyxl"
     )
 
@@ -282,29 +282,26 @@ if __name__ == "__main__":
 
     summary = pd.DataFrame(all_results)
 
-        # ---------- Customer Clustering ----------
+    # ---------- Customer Clustering ----------
+# Create customer clusters based only on Reliability Score
 
     features = [
-        "Total_Spend",
-        "Active_Months",
-        "Inactive_Months",
-        "Reliability_Score",
-        "Final_Avg_Spent"
-    ]
+    "Reliability_Score"
+]
 
-    # Prepare features for clustering
+# Prepare features for clustering
     X = summary[features].fillna(0)
 
-    # Standardize the features
+# Standardize the Reliability Score
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Create customer clusters
+# Create customer clusters
     kmeans = KMeans(
-        n_clusters=4,
-        random_state=42,
-        n_init=10
-    )
+    n_clusters=4,
+    random_state=42,
+    n_init=10
+)
 
     summary["Cluster"] = kmeans.fit_predict(X_scaled)
 
@@ -312,15 +309,14 @@ if __name__ == "__main__":
     print(
         summary[
             [
-                "Customer_ID",
-                "Total_Spend",
-                "Reliability_Score",
-                "Active_Months",
-                "Inactive_Months",
-                "Cluster"
-            ]
-        ].head(20)
-    )
+            "Customer_ID",
+            "Reliability_Score",
+            "Cluster"
+        ]
+    ].head(20)
+)
+
+
 # ---------------------------------------------------------
 # CLUSTER INTERPRETATION
 # ---------------------------------------------------------
@@ -328,73 +324,46 @@ if __name__ == "__main__":
     print("\nCluster Summary")
 
     cluster_summary = (
-            summary.groupby("Cluster")
-            .agg(
+    summary.groupby("Cluster")
+    .agg(
         Customer_Count=("Customer_ID", "count"),
-        Avg_Total_Spend=("Total_Spend", "mean"),
         Avg_Reliability=("Reliability_Score", "mean"),
         Avg_Active_Months=("Active_Months", "mean"),
         Avg_Inactive_Months=("Inactive_Months", "mean")
     )
-        .reset_index()
+    .reset_index()
 )
-# Assign meaningful business segments to each cluster
-# K-Means cluster numbers are arbitrary, so we give them
-# business meaning based on reliability and spending.
 
-# Cluster with the lowest average reliability
-# = customers most likely to exit
-    exit_cluster = cluster_summary.loc[
-    cluster_summary["Avg_Reliability"].idxmin(),
-    "Cluster"
-]
 
-# Cluster with the highest average spending
-# = high-value customers
-    high_value_cluster = cluster_summary.loc[
-    cluster_summary["Avg_Total_Spend"].idxmax(),
-    "Cluster"
-]
+    # Assign meaningful business segments based only on
+    # average Reliability Score.
+    # K-Means cluster numbers are arbitrary.
 
-# From the remaining clusters, choose the one with
-# the highest reliability as likely to stay.
-    remaining_clusters = cluster_summary[
-    ~cluster_summary["Cluster"].isin(
-        [exit_cluster, high_value_cluster]
-    )
-]
+    sorted_clusters = cluster_summary.sort_values(
+    "Avg_Reliability"
+)["Cluster"].tolist()
 
-    stay_cluster = remaining_clusters.loc[
-    remaining_clusters["Avg_Reliability"].idxmax(),
-    "Cluster"
-]
-
-# The remaining cluster becomes At Risk
-    at_risk_cluster = cluster_summary[
-    ~cluster_summary["Cluster"].isin(
-        [exit_cluster, high_value_cluster, stay_cluster]
-    )
-]["Cluster"].iloc[0]
-
-# Map cluster numbers to meaningful business segments
     segment_map = {
-    exit_cluster: "Likely to Exit",
-    at_risk_cluster: "At Risk",
-    stay_cluster: "Likely to Stay",
-    high_value_cluster: "High-Value Loyal"
+    sorted_clusters[0]: "Likely to Exit",
+    sorted_clusters[1]: "At Risk",
+    sorted_clusters[2]: "Likely to Stay",
+    sorted_clusters[3]: "Very Loyal"
 }
 
-# Add segment name to cluster summary
+
+    # Add segment name to cluster summary
     cluster_summary["Customer_Segment"] = cluster_summary["Cluster"].map(
     segment_map
 )
+
 
 # Add segment name to every customer
     summary["Customer_Segment"] = summary["Cluster"].map(
     segment_map
 )
-   
 
+
+# Save cluster summary
     cluster_summary.to_csv(
     os.path.join(OUTPUT_DIR, "cluster_summary.csv"),
     index=False
@@ -408,6 +377,11 @@ if __name__ == "__main__":
 
     print(cluster_summary)
 
+
+# ---------------------------------------------------------
+# CUSTOMER RISK CLASSIFICATION
+# ---------------------------------------------------------
+
     def assign_risk(reliability):
 
         if reliability < 30:
@@ -420,17 +394,20 @@ if __name__ == "__main__":
             return "Low Risk"
 
 
-    summary["Risk_Level"] = summary["Reliability_Score"].apply(assign_risk)
+    summary["Risk_Level"] = summary["Reliability_Score"].apply(
+    assign_risk
+)
+
 
     print("\nCustomer Risk Distribution")
     print(summary["Risk_Level"].value_counts())
 
+
     print("\nCustomer Risk Details")
     print(
         summary[
-            [
+        [
             "Customer_ID",
-            "Total_Spend",
             "Reliability_Score",
             "Active_Months",
             "Inactive_Months",
@@ -440,37 +417,48 @@ if __name__ == "__main__":
         ]
     ]
 )
-    
 
-        # ---------- Cluster Visualization ----------
+
+# ---------- Cluster Visualization ----------
 
     plt.figure(figsize=(10, 6))
 
     for cluster in sorted(summary["Cluster"].unique()):
 
         cluster_data = summary[
-            summary["Cluster"] == cluster
-        ]
+        summary["Cluster"] == cluster
+    ]
 
         segment_name = segment_map[cluster]
 
         plt.scatter(
-            cluster_data["Total_Spend"],
-            cluster_data["Reliability_Score"],
-            label=segment_name
-        )
+        [cluster] * len(cluster_data),
+        cluster_data["Reliability_Score"],
+        label=segment_name
+    )
 
-    plt.xlabel("Total Spend")
+
+    plt.xlabel("Customer Cluster")
     plt.ylabel("Reliability Score")
-    plt.title("Customer Segmentation")
+    plt.title("Customer Segmentation Based on Reliability Score")
+
+    plt.xticks(
+    sorted(summary["Cluster"].unique()),
+    [
+        segment_map[c]
+        for c in sorted(summary["Cluster"].unique())
+    ],
+    rotation=15
+)
+
     plt.legend()
     plt.grid(True)
 
     plt.savefig(
         os.path.join(OUTPUT_DIR, "customer_clusters.png"),
-        dpi=300,
-        bbox_inches="tight"
-    )
+    dpi=300,
+    bbox_inches="tight"
+)
 
     plt.show()
     summary.to_csv(
