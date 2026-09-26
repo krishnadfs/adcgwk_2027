@@ -1,6 +1,8 @@
+
 # Keep Excel workbooks local-only.
 *.xlsx
 
 # Ignore generated artifacts in output folder.
+output/*.csv
 output/*.json
 output/*.png
