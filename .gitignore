@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+
+data/*.xlsx
+data/*.raw.pkl
+
+output/*.pkl
+output/*.joblib
+
+customer_churn.py
+customer_weekly_analysis.py
+customer_13085_weekly_analysis.ipynb
+.ipynb_checkpoints/

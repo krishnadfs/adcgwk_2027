@@ -1,0 +1,42 @@
+[
+    {
+        "Cluster":0,
+        "Customer_Count":1635,
+        "Avg_Value":8417.0538348624,
+        "Avg_Invoice_Value":410.8900550459,
+        "Avg_Reliability":37.490440367,
+        "Avg_Recency_Days":75.223853211,
+        "Avg_Volatility":1.4038831804,
+        "Customer_Segment":"High-Value, Reliable, Recent"
+    },
+    {
+        "Cluster":1,
+        "Customer_Count":2457,
+        "Avg_Value":860.7535205535,
+        "Avg_Invoice_Value":263.4952462352,
+        "Avg_Reliability":19.7458323158,
+        "Avg_Recency_Days":121.2051282051,
+        "Avg_Volatility":1.935391453,
+        "Customer_Segment":"Mid-Value, Unreliable, Recent"
+    },
+    {
+        "Cluster":2,
+        "Customer_Count":1737,
+        "Avg_Value":505.0546229131,
+        "Avg_Invoice_Value":282.1994991364,
+        "Avg_Reliability":21.8949740933,
+        "Avg_Recency_Days":491.4830166955,
+        "Avg_Volatility":3.7038569948,
+        "Customer_Segment":"Mid-Value, Unreliable, Lapsed"
+    },
+    {
+        "Cluster":3,
+        "Customer_Count":113,
+        "Avg_Value":-832.6047787611,
+        "Avg_Invoice_Value":-594.0161946903,
+        "Avg_Reliability":39.7492035398,
+        "Avg_Recency_Days":524.1238938053,
+        "Avg_Volatility":1.5508097345,
+        "Customer_Segment":"Low-Value, Reliable, Lapsed"
+    }
+]

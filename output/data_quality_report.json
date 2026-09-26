@@ -1,0 +1,19 @@
+{
+  "rows_loaded": 1068371,
+  "blank_rows_removed": 482,
+  "duplicate_header_rows_removed": 1,
+  "missing_customer_id_removed": 243007,
+  "invalid_numeric_or_date_removed": 0,
+  "fully_duplicate_transaction_rows": 52525,
+  "duplicates_dropped": false,
+  "negative_quantity_rows": 18747,
+  "cancelled_invoice_rows": 18747,
+  "cancellations_excluded": false,
+  "rows_after_cleaning": 824881,
+  "unique_customers": 5942,
+  "unique_invoices": 44876,
+  "countries_seen": 41,
+  "country_filter": null,
+  "date_range_start": "2009-12-01",
+  "date_range_end": "2011-12-09"
+}
