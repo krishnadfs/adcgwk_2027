@@ -34,6 +34,13 @@ class MonthRow:
     active_period: Optional[str] = None         # col O  Active / Inactive
 
 
+@dataclass
+class MonthClassification:
+    spend_flag: int
+    no_decline_flag: int
+    active_flag: int
+
+
 class ActivePeriodClassifier:
     """
     Rules
@@ -55,6 +62,22 @@ class ActivePeriodClassifier:
         self.spend_threshold = spend_threshold      # pivot!G32
         self.max_decline_months = max_decline_months  # pivot!G33
         self.rows: List[MonthRow] = []
+        self._decline_streak = 0
+
+    def classify_month(self, spend: float, relative_increment: float) -> MonthClassification:
+        if relative_increment < 0:
+            self._decline_streak += 1
+        else:
+            self._decline_streak = 0
+
+        spend_flag = 1 if spend > self.spend_threshold else 0
+        no_decline_flag = 1 if self._decline_streak <= self.max_decline_months else 0
+
+        return MonthClassification(
+            spend_flag=spend_flag,
+            no_decline_flag=no_decline_flag,
+            active_flag=spend_flag and no_decline_flag,
+        )
 
     # ---------- consume ----------
     def load(self, records: List[Dict]) -> "ActivePeriodClassifier":
@@ -107,13 +130,11 @@ class ActivePeriodClassifier:
         return self
 
     def _no_decline(self, i: int) -> int:
-        """1 unless rel_incr_increase was negative for all of the last
-        max_decline_months rows up to and including row i; 1 if there
-        isn't yet enough history to form a full window."""
+        """Return 0 only after more than max_decline_months declines in a row."""
         n = self.max_decline_months
-        if i + 1 < n:                       # not enough history for a full run
+        if i + 1 <= n:                      # not enough history to exceed the limit
             return 1
-        window = self.rows[i - n + 1: i + 1]
+        window = self.rows[i - n: i + 1]
         if all((w.rel_incr_increase or 0.0) < 0 for w in window):
             return 0
         return 1
