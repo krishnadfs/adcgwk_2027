@@ -4,8 +4,18 @@
 # avgSpent (invoice-weighted running average), relIncrIncrease,
 # spendFlag, noDeclineFlag, activePeriod.
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Dict, Optional
+import pandas as pd
+import os
+import json
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 
 @dataclass
@@ -77,10 +87,17 @@ class ActivePeriodClassifier:
             cum_invoices += r.invoices
             r.till_date = cum_price
 
-            # invoice-weighted running average spend per invoice
-            r.avg_spent = cum_price / cum_invoices if cum_invoices else 0.0
+            # Cumulative invoice-weighted average spend per invoice
+            r.avg_spent = (
+            cum_price / cum_invoices
+            if cum_invoices else 0.0
+            )
 
-            r.rel_incr_increase = 0.0 if prev_avg is None else r.avg_spent - prev_avg
+            r.rel_incr_increase = (
+            0.0 if prev_avg is None
+            else r.avg_spent - prev_avg
+            )
+
             prev_avg = r.avg_spent
 
             r.spend_flag = 1 if r.price > self.spend_threshold else 0
@@ -108,7 +125,6 @@ class ActivePeriodClassifier:
 
     def to_dataframe(self):
         """Return computed rows as a pandas DataFrame (requires pandas)."""
-        import pandas as pd
         return pd.DataFrame(self.to_records())
 
     def active_periods(self) -> List[str]:
@@ -124,16 +140,370 @@ class ActivePeriodClassifier:
                 "total_spend": round(sum(r.price for r in self.rows), 2),
                 "final_avg_spent": round(self.rows[-1].avg_spent, 4) if self.rows else None}
 
+class ReliabilityScoreCalculator:
+    """
+    Calculates reliability score based on Active/Inactive months.
+    """
 
+    def calculate(self, classifier: ActivePeriodClassifier):
+        summary = classifier.summary()
+
+        total_months = summary["months"]
+        active_months = summary["active_months"]
+        inactive_months = summary["inactive_months"]
+
+        reliability_score = (
+            active_months / total_months * 100
+            if total_months > 0 else 0
+        )
+        if reliability_score >= 80:
+            prediction = "Very Loyal"
+
+        elif reliability_score >= 60:
+            prediction = "Likely to Stay"
+
+        elif reliability_score >= 40:
+            prediction = "At Risk"
+
+        else:
+            prediction = "Likely to Exit"
+
+        return {
+            "total_months": total_months,
+            "active_months": active_months,
+            "inactive_months": inactive_months,
+            "reliability_score": round(reliability_score, 2),
+            "prediction": prediction
+        }
+def analyze_customer(df, customer_id):
+
+    customer_df = df[
+        (df["Customer ID"] == customer_id) &
+        (df["Country"] == "United Kingdom")
+    ].copy()
+
+    if customer_df.empty:
+        return None
+
+    customer_df["InvoiceDate"] = pd.to_datetime(customer_df["InvoiceDate"])
+
+    monthly_spend = (
+        customer_df
+        .groupby(customer_df["InvoiceDate"].dt.to_period("M"))["Price"]
+        .sum()
+        .reset_index()
+    )
+
+    monthly_spend["Abs_Growth"] = monthly_spend["Price"].diff()
+    monthly_spend["Pct_Growth"] = monthly_spend["Price"].pct_change() * 100
+
+    monthly_records = []
+
+    for month, group in customer_df.groupby(customer_df["InvoiceDate"].dt.to_period("M")):
+
+        monthly_records.append({
+            "period": f"{month.year}_{month.month}",
+            "quantity": group["Quantity"].sum(),
+            "price": group["Price"].sum(),
+            "invoices": group["Invoice"].count()
+        })
+
+    clf = ActivePeriodClassifier(
+        spend_threshold=100,
+        max_decline_months=4
+    )
+
+    clf.load(monthly_records).compute()
+
+    reliability = ReliabilityScoreCalculator()
+    result = reliability.calculate(clf)
+
+    return {
+    "Customer_ID": customer_id,
+    "Monthly_KPIs": monthly_spend,
+    "Summary": clf.summary(),
+    "Reliability": result,
+    "Details": clf.to_dataframe()
+    }
 # ---------- example ----------
+
+
+
 if __name__ == "__main__":
-    data = [
-        {"period": "2009_12", "quantity": 735, "price": 218.52, "invoices": 55},
-        {"period": "2010_1",  "quantity": 293, "price": 95.83,  "invoices": 25},
-        {"period": "2010_2",  "quantity": 273, "price": 71.31,  "invoices": 19},
-        {"period": "2010_3",  "quantity": 423, "price": 163.01, "invoices": 41},
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    df = pd.read_excel(
+        os.path.join(PROJECT_ROOT, "data", "customer_transactions.xlsx"),
+        engine="openpyxl"
+    )
+
+    # Single customer
+    result = analyze_customer(df, 13078)
+    with open(os.path.join(OUTPUT_DIR, "customer13078.json"), "w") as f:
+        json.dump({
+        "Customer_ID": result["Customer_ID"],
+        "Summary": result["Summary"],
+        "Reliability": result["Reliability"],
+        "Details": result["Details"].to_dict(orient="records")
+    }, f, indent=4)
+
+    print("Customer JSON saved.")
+
+    print("\nSummary")
+    print(result["Summary"])
+
+    print("\nReliability")
+    print(result["Reliability"])
+
+    print("\nDetailed Results")
+    print(result["Details"])
+
+    # All customers summary
+    all_results = []
+
+    customer_ids = df["Customer ID"].dropna().unique()
+
+    for cid in customer_ids:
+
+        result = analyze_customer(df, cid)
+
+        if result is None:
+            continue
+
+        all_results.append({
+    "Customer_ID": cid,
+    "Total_Months": result["Reliability"]["total_months"],
+    "Active_Months": result["Reliability"]["active_months"],
+    "Inactive_Months": result["Reliability"]["inactive_months"],
+    "Reliability_Score": result["Reliability"]["reliability_score"],
+    "Total_Spend": result["Summary"]["total_spend"],
+    "Final_Avg_Spent": result["Summary"]["final_avg_spent"]
+})
+
+    summary = pd.DataFrame(all_results)
+
+    # ---------- Customer Clustering ----------
+# Create customer clusters based only on Reliability Score
+
+    features = [
+    "Reliability_Score"
+]
+
+# Prepare features for clustering
+    X = summary[features].fillna(0)
+
+# Standardize the Reliability Score
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+# Create customer clusters
+    kmeans = KMeans(
+    n_clusters=4,
+    random_state=42,
+    n_init=10
+)
+
+    summary["Cluster"] = kmeans.fit_predict(X_scaled)
+
+    print("\nCustomer Clustering Results")
+    print(
+        summary[
+            [
+            "Customer_ID",
+            "Reliability_Score",
+            "Cluster"
+        ]
+    ].head(20)
+)
+
+
+# ---------------------------------------------------------
+# CLUSTER INTERPRETATION
+# ---------------------------------------------------------
+
+    print("\nCluster Summary")
+
+    cluster_summary = (
+    summary.groupby("Cluster")
+    .agg(
+        Customer_Count=("Customer_ID", "count"),
+        Avg_Reliability=("Reliability_Score", "mean"),
+        Avg_Active_Months=("Active_Months", "mean"),
+        Avg_Inactive_Months=("Inactive_Months", "mean")
+    )
+    .reset_index()
+)
+
+
+    # Assign meaningful business segments based only on
+    # average Reliability Score.
+    # K-Means cluster numbers are arbitrary.
+
+    sorted_clusters = cluster_summary.sort_values(
+    "Avg_Reliability"
+)["Cluster"].tolist()
+
+    segment_map = {
+    sorted_clusters[0]: "Likely to Exit",
+    sorted_clusters[1]: "At Risk",
+    sorted_clusters[2]: "Likely to Stay",
+    sorted_clusters[3]: "Very Loyal"
+}
+
+
+    # Add segment name to cluster summary
+    cluster_summary["Customer_Segment"] = cluster_summary["Cluster"].map(
+    segment_map
+)
+
+
+# Add segment name to every customer
+    summary["Customer_Segment"] = summary["Cluster"].map(
+    segment_map
+)
+
+
+# Save cluster summary
+    cluster_summary.to_csv(
+    os.path.join(OUTPUT_DIR, "cluster_summary.csv"),
+    index=False
+)
+
+    cluster_summary.to_json(
+    os.path.join(OUTPUT_DIR, "cluster_summary.json"),
+    orient="records",
+    indent=4
+)
+
+    print(cluster_summary)
+
+
+# ---------------------------------------------------------
+# CUSTOMER RISK CLASSIFICATION
+# ---------------------------------------------------------
+
+    def assign_risk(reliability):
+
+        if reliability < 30:
+            return "High Risk"
+
+        elif reliability < 60:
+            return "Medium Risk"
+
+        else:
+            return "Low Risk"
+
+
+    summary["Risk_Level"] = summary["Reliability_Score"].apply(
+    assign_risk
+)
+
+
+    print("\nCustomer Risk Distribution")
+    print(summary["Risk_Level"].value_counts())
+
+
+    print("\nCustomer Risk Details")
+    print(
+        summary[
+        [
+            "Customer_ID",
+            "Reliability_Score",
+            "Active_Months",
+            "Inactive_Months",
+            "Cluster",
+            "Customer_Segment",
+            "Risk_Level"
+        ]
     ]
-    clf = ActivePeriodClassifier(spend_threshold=100, max_decline_months=4).load(data).compute()
-    for rec in clf.to_records():
-        print(rec["period"], round(rec["avg_spent"], 4), rec["spend_flag"], rec["no_decline_flag"], rec["active_period"])
-    print(clf.summary())
+)
+
+
+# ---------- Cluster Visualization ----------
+
+    plt.figure(figsize=(10, 6))
+
+    for cluster in sorted(summary["Cluster"].unique()):
+
+        cluster_data = summary[
+        summary["Cluster"] == cluster
+    ]
+
+        segment_name = segment_map[cluster]
+
+        plt.scatter(
+        [cluster] * len(cluster_data),
+        cluster_data["Reliability_Score"],
+        label=segment_name
+    )
+
+
+    plt.xlabel("Customer Cluster")
+    plt.ylabel("Reliability Score")
+    plt.title("Customer Segmentation Based on Reliability Score")
+
+    plt.xticks(
+    sorted(summary["Cluster"].unique()),
+    [
+        segment_map[c]
+        for c in sorted(summary["Cluster"].unique())
+    ],
+    rotation=15
+)
+
+    plt.legend()
+    plt.grid(True)
+
+    plt.savefig(
+        os.path.join(OUTPUT_DIR, "customer_clusters.png"),
+    dpi=300,
+    bbox_inches="tight"
+)
+
+    plt.show()
+    summary.to_csv(
+    os.path.join(OUTPUT_DIR, "all_customers_summary.csv"),
+    index=False
+)
+    plt.figure(figsize=(8, 5))
+
+    summary["Risk_Level"].value_counts().plot(kind="bar")
+
+    plt.title("Customer Risk Distribution")
+    plt.xlabel("Risk Level")
+    plt.ylabel("Number of Customers")
+    plt.xticks(rotation=0)
+    plt.tight_layout()
+
+    plt.savefig(
+    os.path.join(OUTPUT_DIR, "customer_risk_distribution.png"),
+    dpi=300,
+    bbox_inches="tight"
+)
+
+    plt.show()
+
+    print("\nAll customers summary saved.")
+    
+
+    summary.plot(
+    x="Customer_ID",
+    y="Reliability_Score",
+    kind="bar"
+)
+
+    plt.title("Customer Reliability Score")
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "reliability_plot.png"))
+    plt.show()
+
+    print("Plot saved to output/reliability_plot.png")
+    
+
+    summary.to_json(
+    os.path.join(OUTPUT_DIR, "all_customers_summary.json"),
+    orient="records",
+    indent=4
+    )
+
+    print("All customers JSON saved.")
