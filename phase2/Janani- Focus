@@ -1,0 +1,78 @@
+# ============================================================
+# TEST CASES 12 - 15
+# Focus: Active / Inactive Classification and Edge Cases
+# ============================================================
+
+
+# TEST CASE 12
+def test_12_active_customer():
+    rows = [
+        create_row(200, 10)
+    ]
+
+    classifier = create_classifier(
+        rows,
+        spend_threshold=100,
+        max_decline_months=3
+    )
+
+    classifier.compute()
+
+    assert rows[0].spend_flag == 1
+    assert rows[0].no_decline_flag == 1
+    assert rows[0].active_period == "Active"
+
+
+# TEST CASE 13
+def test_13_inactive_customer():
+    rows = [
+        create_row(50, 10)
+    ]
+
+    classifier = create_classifier(
+        rows,
+        spend_threshold=100
+    )
+
+    classifier.compute()
+
+    assert rows[0].spend_flag == 0
+    assert rows[0].active_period == "Inactive"
+
+
+# TEST CASE 14
+def test_14_zero_price_zero_invoices():
+    rows = [
+        create_row(0, 0)
+    ]
+
+    classifier = create_classifier(rows)
+    classifier.compute()
+
+    assert rows[0].value_per_invoice == 0.0
+    assert rows[0].till_date == 0.0
+    assert rows[0].avg_spent == 0.0
+    assert rows[0].rel_incr_increase == 0.0
+    assert rows[0].spend_flag == 0
+    assert rows[0].no_decline_flag == 1
+    assert rows[0].active_period == "Inactive"
+
+
+# TEST CASE 15
+def test_15_complete_kpi_calculation():
+    rows = [
+        create_row(200, 10),
+        create_row(300, 10),
+        create_row(250, 10),
+        create_row(150, 10)
+    ]
+
+    classifier = create_classifier(
+        rows,
+        spend_threshold=100,
+        max_decline_months=3
+    )
+
+    result = classifier.compute()
+
+    assert result is classifier
