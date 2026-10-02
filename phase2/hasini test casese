@@ -1,0 +1,208 @@
+import unittest
+from dataclasses import dataclass
+from your_file import ActivePeriodClassifier, ReliabilityScoreCalculator
+
+
+@dataclass
+class TestRow:
+    period: str
+    active_period: str
+    price: float
+    avg_spent: float
+
+
+class TestActivePeriodClassifier(unittest.TestCase):
+
+    def create_classifier(self, rows):
+        classifier = ActivePeriodClassifier.__new__(ActivePeriodClassifier)
+        classifier.rows = rows
+        return classifier
+
+    # TC01: All months are active
+    def test_all_months_active(self):
+        rows = [
+            TestRow("Jan", "Active", 1000, 1000),
+            TestRow("Feb", "Active", 1200, 1100),
+            TestRow("Mar", "Active", 1500, 1233.3333),
+            TestRow("Apr", "Active", 1300, 1250),
+            TestRow("May", "Active", 1100, 1220),
+        ]
+
+        classifier = self.create_classifier(rows)
+        result = classifier.summary()
+
+        self.assertEqual(result["months"], 5)
+        self.assertEqual(result["active_months"], 5)
+        self.assertEqual(result["inactive_months"], 0)
+        self.assertEqual(result["total_spend"], 6100)
+        self.assertEqual(result["final_avg_spent"], 1220)
+
+
+    # TC02: Some months are active
+    def test_some_months_active(self):
+        rows = [
+            TestRow("Jan", "Active", 1000, 1000),
+            TestRow("Feb", "Inactive", 1200, 1100),
+            TestRow("Mar", "Active", 1500, 1233.3333),
+            TestRow("Apr", "Inactive", 1300, 1250),
+            TestRow("May", "Active", 1100, 1220),
+        ]
+
+        classifier = self.create_classifier(rows)
+        result = classifier.summary()
+
+        self.assertEqual(result["months"], 5)
+        self.assertEqual(result["active_months"], 3)
+        self.assertEqual(result["inactive_months"], 2)
+
+
+    # TC03: No months are active
+    def test_no_months_active(self):
+        rows = [
+            TestRow("Jan", "Inactive", 1000, 1000),
+            TestRow("Feb", "Inactive", 1200, 1100),
+            TestRow("Mar", "Inactive", 1500, 1233.3333),
+            TestRow("Apr", "Inactive", 1300, 1250),
+            TestRow("May", "Inactive", 1100, 1220),
+        ]
+
+        classifier = self.create_classifier(rows)
+        result = classifier.summary()
+
+        self.assertEqual(result["months"], 5)
+        self.assertEqual(result["active_months"], 0)
+        self.assertEqual(result["inactive_months"], 5)
+
+
+    # TC04: Empty rows
+    def test_empty_rows(self):
+        classifier = self.create_classifier([])
+
+        result = classifier.summary()
+
+        self.assertEqual(result["months"], 0)
+        self.assertEqual(result["active_months"], 0)
+        self.assertEqual(result["inactive_months"], 0)
+        self.assertEqual(result["total_spend"], 0)
+        self.assertIsNone(result["final_avg_spent"])
+
+
+    # TC05: Active periods list
+    def test_active_periods(self):
+        rows = [
+            TestRow("Jan", "Active", 1000, 1000),
+            TestRow("Feb", "Inactive", 1200, 1100),
+            TestRow("Mar", "Active", 1500, 1233.3333),
+            TestRow("Apr", "Inactive", 1300, 1250),
+            TestRow("May", "Active", 1100, 1220),
+        ]
+
+        classifier = self.create_classifier(rows)
+
+        result = classifier.active_periods()
+
+        self.assertEqual(
+            result,
+            ["Jan", "Mar", "May"]
+        )
+
+
+    # TC06: No active periods
+    def test_no_active_periods(self):
+        rows = [
+            TestRow("Jan", "Inactive", 1000, 1000),
+            TestRow("Feb", "Inactive", 1200, 1100),
+        ]
+
+        classifier = self.create_classifier(rows)
+
+        result = classifier.active_periods()
+
+        self.assertEqual(result, [])
+
+
+    # TC07: Convert rows to records
+    def test_to_records(self):
+        rows = [
+            TestRow("Jan", "Active", 1000, 1000),
+            TestRow("Feb", "Inactive", 1200, 1100),
+        ]
+
+        classifier = self.create_classifier(rows)
+
+        result = classifier.to_records()
+
+        self.assertEqual(len(result), 2)
+
+        self.assertEqual(result[0]["period"], "Jan")
+        self.assertEqual(result[0]["active_period"], "Active")
+        self.assertEqual(result[0]["price"], 1000)
+
+        self.assertEqual(result[1]["period"], "Feb")
+        self.assertEqual(result[1]["active_period"], "Inactive")
+        self.assertEqual(result[1]["price"], 1200)
+
+
+    # TC08: Convert rows to DataFrame
+    def test_to_dataframe(self):
+        rows = [
+            TestRow("Jan", "Active", 1000, 1000),
+            TestRow("Feb", "Inactive", 1200, 1100),
+            TestRow("Mar", "Active", 1500, 1233.3333),
+        ]
+
+        classifier = self.create_classifier(rows)
+
+        dataframe = classifier.to_dataframe()
+
+        self.assertEqual(len(dataframe), 3)
+
+        self.assertIn("period", dataframe.columns)
+        self.assertIn("active_period", dataframe.columns)
+        self.assertIn("price", dataframe.columns)
+        self.assertIn("avg_spent", dataframe.columns)
+
+
+class TestReliabilityScoreCalculator(unittest.TestCase):
+
+    def create_classifier(self, total_months, active_months):
+        rows = []
+
+        for i in range(total_months):
+
+            if i < active_months:
+                status = "Active"
+            else:
+                status = "Inactive"
+
+            rows.append(
+                TestRow(
+                    period=f"Month{i + 1}",
+                    active_period=status,
+                    price=1000,
+                    avg_spent=1000
+                )
+            )
+
+        classifier = ActivePeriodClassifier.__new__(
+            ActivePeriodClassifier
+        )
+
+        classifier.rows = rows
+
+        return classifier
+
+
+    # TC09: 100% active
+    def test_100_percent_reliability(self):
+        classifier = self.create_classifier(10, 10)
+
+        calculator = ReliabilityScoreCalculator()
+
+        result = calculator.calculate(classifier)
+
+        self.assertEqual(result["total_months"], 10)
+        self.assertEqual(result["active_months"], 10)
+        self.assertEqual(result["inactive_months"], 0)
+        self.assertEqual(result["reliability_score"], 100.0)
+        self.assertEqual(result["prediction"], "Very Loyal")
