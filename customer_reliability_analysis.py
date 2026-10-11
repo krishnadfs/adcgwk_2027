@@ -277,7 +277,8 @@ class DataQualityReport:
     duplicate_header_rows_removed: int
     missing_customer_id_removed: int
     invalid_numeric_or_date_removed: int
-    fully_duplicate_transaction_rows: int
+    fully_duplicate_transaction_rows: int   # rows in a duplicate group, originals included
+    duplicate_extra_copies: int             # redundant copies only (what drop_duplicates removes)
     duplicates_dropped: bool
     negative_quantity_rows: int
     cancelled_invoice_rows: int
@@ -303,18 +304,21 @@ def _read_year_sheets(path: Path) -> pd.DataFrame:
     from openpyxl import load_workbook
 
     wb = load_workbook(path, read_only=True, data_only=True)
-    year_sheets = [s for s in wb.sheetnames if YEAR_SHEET_PATTERN.match(s)]
-    sheets_to_read = year_sheets or [wb.active.title]
-    logger.info("Reading sheet(s) from %s: %s", path.name, sheets_to_read)
+    try:
+        year_sheets = [s for s in wb.sheetnames if YEAR_SHEET_PATTERN.match(s)]
+        sheets_to_read = year_sheets or [wb.active.title]
+        logger.info("Reading sheet(s) from %s: %s", path.name, sheets_to_read)
 
-    frames = []
-    for name in sheets_to_read:
-        ws = wb[name]
-        rows_iter = ws.iter_rows(values_only=True)
-        header = [h if h is not None else f"col_{i}" for i, h in enumerate(next(rows_iter))]
-        data = list(rows_iter)
-        frames.append(pd.DataFrame(data, columns=header))
-        logger.info("  %s: %d rows", name, len(data))
+        frames = []
+        for name in sheets_to_read:
+            ws = wb[name]
+            rows_iter = ws.iter_rows(values_only=True)
+            header = [h if h is not None else f"col_{i}" for i, h in enumerate(next(rows_iter))]
+            data = list(rows_iter)
+            frames.append(pd.DataFrame(data, columns=header))
+            logger.info("  %s: %d rows", name, len(data))
+    finally:
+        wb.close()  # read-only workbooks keep the file handle open (and locked on Windows) until closed
 
     return pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
 
@@ -373,15 +377,19 @@ def load_transactions(
     missing_cid = int(df["Customer ID"].isna().sum())
     df = df.dropna(subset=["Customer ID"])
 
-    df["Customer ID"] = pd.to_numeric(df["Customer ID"], errors="coerce").astype("int64")
+    df["Customer ID"] = pd.to_numeric(df["Customer ID"], errors="coerce")
     df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce")
     df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
     df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"], errors="coerce")
     before_invalid = len(df)
-    df = df.dropna(subset=["Quantity", "Price", "InvoiceDate"])
+    # A non-numeric Customer ID (e.g. "N/A") becomes NaN above; drop it with the other
+    # unparseable rows (and count it) *before* the int cast, which cannot hold NaN.
+    df = df.dropna(subset=["Customer ID", "Quantity", "Price", "InvoiceDate"])
     invalid_removed = before_invalid - len(df)
+    df["Customer ID"] = df["Customer ID"].astype("int64")
 
-    fully_duplicate = int(df.duplicated(keep=False).sum())
+    fully_duplicate = int(df.duplicated(keep=False).sum())   # every row that belongs to a duplicate group
+    duplicate_extra_copies = int(df.duplicated(keep="first").sum())  # rows drop_duplicates would remove
     if drop_duplicates:
         df = df.drop_duplicates()
 
@@ -406,6 +414,7 @@ def load_transactions(
         missing_customer_id_removed=missing_cid,
         invalid_numeric_or_date_removed=int(invalid_removed),
         fully_duplicate_transaction_rows=fully_duplicate,
+        duplicate_extra_copies=duplicate_extra_copies,
         duplicates_dropped=drop_duplicates,
         negative_quantity_rows=negative_quantity_rows,
         cancelled_invoice_rows=cancelled_rows,
@@ -418,9 +427,10 @@ def load_transactions(
         date_range_start=str(df["InvoiceDate"].min().date()) if len(df) else "N/A",
         date_range_end=str(df["InvoiceDate"].max().date()) if len(df) else "N/A",
     )
-    logger.info("Rows: %d loaded -> %d after cleaning. Duplicates found: %d (dropped=%s). "
-                "Cancellations found: %d (excluded=%s).",
-                rows_loaded, len(df), fully_duplicate, drop_duplicates, cancelled_rows, exclude_cancellations)
+    logger.info("Rows: %d loaded -> %d after cleaning. Duplicate rows found: %d, of which %d are extra "
+                "copies (dropped=%s). Cancellations found: %d (excluded=%s).",
+                rows_loaded, len(df), fully_duplicate, duplicate_extra_copies, drop_duplicates,
+                cancelled_rows, exclude_cancellations)
     return df, report
 
 
@@ -544,6 +554,8 @@ def analyze_single_customer(df: pd.DataFrame, customer_id: int, config: Analysis
 
 def run_portfolio_analysis(df: pd.DataFrame, config: AnalysisConfig) -> pd.DataFrame:
     """Score every customer in df with a single groupby pass (not one full-dataframe scan per customer)."""
+    if df.empty:
+        return pd.DataFrame()
     global_end_period = df["InvoiceDate"].max().to_period("M")
     rows = []
     for customer_id, customer_df in df.groupby("Customer ID"):
@@ -616,6 +628,9 @@ def evaluate_k_range(X_scaled: np.ndarray, k_values: range, random_state: int = 
     Calinski-Harabasz (higher better). No single metric is trusted alone."""
     records = []
     for k in k_values:
+        if k < 1 or k > len(X_scaled):
+            logger.warning("Skipping k=%d: K-Means needs between 1 and n_samples (%d) clusters.", k, len(X_scaled))
+            continue
         km = KMeans(n_clusters=k, random_state=random_state, n_init=20)
         labels = km.fit_predict(X_scaled)
         if 1 < k < len(X_scaled):
@@ -626,7 +641,7 @@ def evaluate_k_range(X_scaled: np.ndarray, k_values: range, random_state: int = 
             sil = db = ch = float("nan")
         records.append({"k": k, "inertia": km.inertia_, "silhouette": sil,
                          "davies_bouldin": db, "calinski_harabasz": ch})
-    return pd.DataFrame(records)
+    return pd.DataFrame(records, columns=["k", "inertia", "silhouette", "davies_bouldin", "calinski_harabasz"])
 
 
 def assign_segments(summary: pd.DataFrame, n_clusters: int, random_state: int = 42,
@@ -911,6 +926,10 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "data_quality_report.json").write_text(json.dumps(dq_report.to_dict(), indent=2))
+
+    if df.empty:
+        logger.warning("No transactions remain after cleaning and filtering; nothing to score.")
+        return
 
     if args.customer_id is not None:
         global_end_period = df["InvoiceDate"].max().to_period("M")

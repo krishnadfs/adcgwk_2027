@@ -12,3 +12,8 @@ customer_churn.py
 customer_weekly_analysis.py
 customer_13085_weekly_analysis.ipynb
 .ipynb_checkpoints/
+.pytest_tmp/
+.pytest-temp-retry/
+.pytest_cache/
+.coverage
+__pycache__/
